@@ -1,0 +1,132 @@
+<!-- templates/doctor_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Doctor Dashboard | MedTrack</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #f0f4f8;
+    }
+
+    .header {
+      background-color: #0077b6;
+      color: white;
+      padding: 20px 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      margin-bottom: 5px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .card {
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    .card h2 {
+      color: #0077b6;
+      margin-bottom: 15px;
+    }
+
+    .appointment, .patient {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .appointment:last-child, .patient:last-child {
+      border-bottom: none;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .actions a {
+      padding: 10px 20px;
+      background-color: #0077b6;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background 0.3s ease;
+    }
+
+    .actions a:hover {
+      background-color: #005f87;
+    }
+
+    footer {
+      text-align: center;
+      padding: 15px;
+      color: #777;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Welcome, Dr. {{ doctor.name }}</h1>
+    <p>Specialist: {{ doctor.specialization }}</p>
+  </div>
+
+  <div class="container">
+
+    <div class="card">
+      <h2>Today's Appointments</h2>
+      {% for appt in appointments %}
+      <div class="appointment">
+        <strong>{{ appt.time }}</strong> – {{ appt.patient }} ({{ appt.reason }})
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>Recent Patients</h2>
+      {% for patient in patients %}
+      <div class="patient">
+        <strong>{{ patient.name }}</strong> – Last Visit: {{ patient.last_visit }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <div class="actions">
+        <a href="#">View All Appointments</a>
+        <a href="#">Patient Records</a>
+        <a href="#">Add Prescription</a>
+        <a href="/">Logout</a>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    &copy; 2025 MedTrack. All rights reserved.
+  </footer>
+
+</body>
+</html>

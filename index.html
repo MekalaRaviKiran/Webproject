@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MedTrack | Home</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .hero {
+      background-color: #0077b6;
+      color: white;
+      padding: 60px 20px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: bold;
+    }
+    .section {
+      padding: 40px 20px;
+    }
+    .section h2 {
+      margin-bottom: 20px;
+      color: #0077b6;
+    }
+    footer {
+      background-color: #003049;
+      color: white;
+      padding: 15px 0;
+      text-align: center;
+    }
+    .btn-custom {
+      background-color: #0077b6;
+      color: white;
+      border-radius: 20px;
+    }
+    .btn-custom:hover {
+      background-color: #005f87;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{{ url_for('index') }}">MedTrack</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('about') }}">About Us</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('contact') }}">Contact Us</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('doctor_dashboard') }}">Doctor Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('patient_dashboard') }}">Patient Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('appointment') }}">Appointments</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('doctor_details') }}">Doctor Details</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('patient_details') }}">Patient Details</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('signup') }}">Signup</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <div class="hero">
+    <h1>Welcome to MedTrack</h1>
+    <p>Your all-in-one healthcare appointment and tracking system.</p>
+    <a href="{{ url_for('signup') }}" class="btn btn-custom mt-3">Get Started</a>
+  </div>
+
+  <!-- About Preview -->
+  <div class="section text-center">
+    <h2>About MedTrack</h2>
+    <p>
+      MedTrack helps patients book appointments, manage their records, and connect with doctors in a seamless, modern platform.
+      Doctors can view, manage, and monitor patient visits with ease.
+    </p>
+  </div>
+
+  <!-- Features -->
+  <div class="section container">
+    <div class="row text-center">
+      <div class="col-md-4">
+        <h4>For Patients</h4>
+        <p>Book appointments, track medical history, and get notifications.</p>
+      </div>
+      <div class="col-md-4">
+        <h4>For Doctors</h4>
+        <p>Manage schedules, access patient records, and update treatment plans.</p>
+      </div>
+      <div class="col-md-4">
+        <h4>Easy Access</h4>
+        <p>Login or sign up from any device, anywhere.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 MedTrack. All rights reserved.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
