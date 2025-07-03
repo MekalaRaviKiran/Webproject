@@ -3,7 +3,7 @@ import boto3
 import uuid
 from botocore.exceptions import ClientError
 
-app = Flask(_name_)
+app = Flask(__name__)
 app.secret_key = 'medtrack_secret'
 
 # AWS Setup
@@ -183,5 +183,5 @@ def contact():
     return render_template('contact.html')
 
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     app.run(debug=True)
