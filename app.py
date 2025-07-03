@@ -1,120 +1,102 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask_sqlalchemy import SQLAlchemy
-import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+import boto3
+import uuid
+from botocore.exceptions import ClientError
 
 app = Flask(__name__)
 app.secret_key = 'medtrack_secret'
 
-# Database Config
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///medtrack.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+# AWS Setup
+dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
+sns_client = boto3.client('sns', region_name='ap-south-1')
+TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:YourTopicName'  # Replace with your real ARN
 
-# ---------------- Models ---------------- #
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    role = db.Column(db.String(10))  # 'doctor' or 'patient'
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(100))
-    license = db.Column(db.String(50))  # Only for doctors
-    specialization = db.Column(db.String(50))  # Only for doctors
-    age = db.Column(db.Integer)  # Only for patients
-    gender = db.Column(db.String(10))  # Only for patients
+# DynamoDB Tables
+users_table = dynamodb.Table('Users')
+appointments_table = dynamodb.Table('Appointments')
 
-class Appointment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    patient_email = db.Column(db.String(100))
-    specialist = db.Column(db.String(100))
-    date = db.Column(db.String(20))
-    time = db.Column(db.String(20))
-    reason = db.Column(db.String(200))
 
-class ContactMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(100))
-    subject = db.Column(db.String(200))
-    message = db.Column(db.Text)
+def send_sns_notification(message, subject='MedTrack Alert'):
+    try:
+        sns_client.publish(
+            TopicArn=TOPIC_ARN,
+            Message=message,
+            Subject=subject
+        )
+    except ClientError as e:
+        print("SNS Error:", e.response['Error']['Message'])
 
-# ---------------- Routes ---------------- #
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/about')
-def about():
-    return render_template('about.html')
-
-@app.route('/contact', methods=['GET', 'POST'])
-def contact():
-    if request.method == 'POST':
-        message = ContactMessage(
-            name=request.form['name'],
-            email=request.form['email'],
-            subject=request.form['subject'],
-            message=request.form['message']
-        )
-        db.session.add(message)
-        db.session.commit()
-        flash('Your message has been sent successfully!', 'success')
-        return redirect(url_for('contact'))
-    return render_template('contact.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        role = request.form.get('role')
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
+        role = request.form['role']
+        email = request.form['email']
+        password = request.form['password']
+        confirm = request.form['confirm_password']
 
-        if password != confirm_password:
+        if password != confirm:
             flash('Passwords do not match.', 'danger')
             return redirect(url_for('signup'))
 
-        if User.query.filter_by(email=email).first():
-            flash('Email already exists.', 'danger')
-            return redirect(url_for('signup'))
+        try:
+            # Check if user already exists
+            if 'Item' in users_table.get_item(Key={'email': email}):
+                flash('Email already exists.', 'danger')
+                return redirect(url_for('signup'))
 
-        user = User(role=role, name=name, email=email, password=password)
+            user = {
+                'email': email,
+                'password': password,
+                'role': role,
+                'name': request.form['name']
+            }
 
-        if role == 'doctor':
-            user.license = request.form.get('license')
-            user.specialization = request.form.get('specialization')
-        elif role == 'patient':
-            user.age = request.form.get('age')
-            user.gender = request.form.get('gender')
+            if role == 'doctor':
+                user['license'] = request.form['license']
+                user['specialization'] = request.form['specialization']
+            else:
+                user['age'] = request.form['age']
+                user['gender'] = request.form['gender']
 
-        db.session.add(user)
-        db.session.commit()
-        flash(f'{role.capitalize()} signup successful!', 'success')
-        return redirect(url_for('login'))
+            users_table.put_item(Item=user)
+            flash(f'{role.capitalize()} registered successfully!', 'success')
+            return redirect(url_for('login'))
+        except ClientError as e:
+            flash("Error: " + e.response['Error']['Message'], 'danger')
 
     return render_template('signup.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        role = request.form['role']
         email = request.form['email']
         password = request.form['password']
+        role = request.form['role']
 
-        user = User.query.filter_by(email=email, role=role, password=password).first()
-
-        if user:
-            session['user'] = {'email': email, 'role': role, 'name': user.name}
-            return redirect(url_for(f'{role}_dashboard'))
-        flash('Invalid credentials!', 'danger')
+        try:
+            user = users_table.get_item(Key={'email': email}).get('Item')
+            if user and user['password'] == password and user['role'] == role:
+                session['user'] = {'email': email, 'role': role, 'name': user['name']}
+                return redirect(url_for(f'{role}_dashboard'))
+            flash('Invalid credentials.', 'danger')
+        except:
+            flash('Login failed.', 'danger')
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
     session.clear()
-    flash('You have been logged out.', 'info')
+    flash('Logged out.', 'info')
     return redirect(url_for('index'))
+
 
 @app.route('/doctor/dashboard')
 def doctor_dashboard():
@@ -123,10 +105,17 @@ def doctor_dashboard():
         flash('Access denied.', 'danger')
         return redirect(url_for('login'))
 
-    doctor = User.query.filter_by(email=user['email']).first()
-    appointments = Appointment.query.filter_by(specialist=doctor.specialization).all()
-    patients = User.query.filter_by(role='patient').all()
+    doctor_email = user['email']
+    doctor = users_table.get_item(Key={'email': doctor_email}).get('Item')
+    spec = doctor.get('specialization')
+
+    all_appts = appointments_table.scan().get('Items', [])
+    appointments = [a for a in all_appts if a['specialist'] == spec]
+
+    patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+
     return render_template('doctor_dashboard.html', doctor=doctor, appointments=appointments, patients=patients)
+
 
 @app.route('/patient/dashboard')
 def patient_dashboard():
@@ -135,43 +124,58 @@ def patient_dashboard():
         flash('Access denied.', 'danger')
         return redirect(url_for('login'))
 
-    appointments = Appointment.query.filter_by(patient_email=user['email']).all()
-    doctors = User.query.filter_by(role='doctor').all()
+    all_appts = appointments_table.scan().get('Items', [])
+    appointments = [a for a in all_appts if a['patient_email'] == user['email']]
+
+    doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+
     return render_template('patient_dashboard.html', user=user['name'], appointments=appointments, doctors=doctors)
 
-@app.route('/doctor/details')
-def doctor_details():
-    doctors = User.query.filter_by(role='doctor').all()
-    return render_template('doctor_details.html', doctors=doctors)
-
-@app.route('/patient/details')
-def patient_details():
-    patients = User.query.filter_by(role='patient').all()
-    return render_template('patient_details.html', patients=patients)
 
 @app.route('/patient/appointment', methods=['GET', 'POST'])
 def appointment():
     if 'user' not in session or session['user']['role'] != 'patient':
-        flash('Please log in as a patient.', 'danger')
+        flash('Login as a patient.', 'danger')
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        appt = Appointment(
-            patient_email=session['user']['email'],
-            specialist=request.form['specialist'],
-            date=request.form['date'],
-            time=request.form['time'],
-            reason=request.form['reason']
-        )
-        db.session.add(appt)
-        db.session.commit()
-        flash('Appointment booked successfully!', 'success')
+        appt = {
+            'appointment_id': str(uuid.uuid4()),
+            'patient_email': session['user']['email'],
+            'specialist': request.form['specialist'],
+            'date': request.form['date'],
+            'time': request.form['time'],
+            'reason': request.form['reason']
+        }
+        appointments_table.put_item(Item=appt)
+
+        msg = f"New appointment for {appt['patient_email']} with {appt['specialist']} on {appt['date']} at {appt['time']}"
+        send_sns_notification(msg)
+
+        flash('Appointment booked successfully.', 'success')
         return redirect(url_for('appointment'))
 
     return render_template('appointment.html', user=session['user'])
 
-# ---------------- Main ---------------- #
+@app.route('/patient/details')
+def patient_details():
+    patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+    return render_template('patient_details.html', patients=patients)
+
+
+@app.route('/doctor/details')
+def doctor_details():
+    doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+    return render_template('doctor_details.html', doctors=doctors)
+
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        flash('We received your message!', 'success')
+        return redirect(url_for('contact'))
+    return render_template('contact.html')
+
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
