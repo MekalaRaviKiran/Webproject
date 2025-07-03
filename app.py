@@ -1,22 +1,28 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import boto3
 import uuid
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 app = Flask(__name__)
 app.secret_key = 'medtrack_secret'
 
 # AWS Setup
-dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
-sns_client = boto3.client('sns', region_name='ap-south-1')
-TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:YourTopicName'  # Replace with your real ARN
+try:
+    dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
+    sns_client = boto3.client('sns', region_name='ap-south-1')
+    users_table = dynamodb.Table('Users')
+    appointments_table = dynamodb.Table('Appointments')
+    AWS_READY = True
+except Exception as e:
+    print("AWS Setup Error:", str(e))
+    AWS_READY = False
 
-# DynamoDB Tables
-users_table = dynamodb.Table('Users')
-appointments_table = dynamodb.Table('Appointments')
-
+TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:YourTopicName'  # Replace later
 
 def send_sns_notification(message, subject='MedTrack Alert'):
+    if not AWS_READY:
+        print("Skipping SNS (No AWS credentials).")
+        return
     try:
         sns_client.publish(
             TopicArn=TOPIC_ARN,
@@ -49,8 +55,11 @@ def signup():
             flash('Passwords do not match.', 'danger')
             return redirect(url_for('signup'))
 
+        if not AWS_READY:
+            flash("AWS credentials not set. Try again later.", 'danger')
+            return redirect(url_for('signup'))
+
         try:
-            # Check if user already exists
             if 'Item' in users_table.get_item(Key={'email': email}):
                 flash('Email already exists.', 'danger')
                 return redirect(url_for('signup'))
@@ -72,8 +81,8 @@ def signup():
             users_table.put_item(Item=user)
             flash(f'{role.capitalize()} registered successfully!', 'success')
             return redirect(url_for('login'))
-        except ClientError as e:
-            flash("Error: " + e.response['Error']['Message'], 'danger')
+        except (ClientError, NoCredentialsError) as e:
+            flash(f"AWS Error: {str(e)}", 'danger')
 
     return render_template('signup.html')
 
@@ -84,6 +93,10 @@ def login():
         email = request.form['email']
         password = request.form['password']
         role = request.form['role']
+
+        if not AWS_READY:
+            flash("AWS not ready. Cannot log in.", 'danger')
+            return redirect(url_for('login'))
 
         try:
             user = users_table.get_item(Key={'email': email}).get('Item')
@@ -110,14 +123,17 @@ def doctor_dashboard():
         flash('Access denied.', 'danger')
         return redirect(url_for('login'))
 
-    doctor_email = user['email']
-    doctor = users_table.get_item(Key={'email': doctor_email}).get('Item')
-    spec = doctor.get('specialization')
-
-    all_appts = appointments_table.scan().get('Items', [])
-    appointments = [a for a in all_appts if a['specialist'] == spec]
-
-    patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+    doctor, appointments, patients = {}, [], []
+    if AWS_READY:
+        try:
+            doctor_email = user['email']
+            doctor = users_table.get_item(Key={'email': doctor_email}).get('Item')
+            spec = doctor.get('specialization', '')
+            all_appts = appointments_table.scan().get('Items', [])
+            appointments = [a for a in all_appts if a['specialist'] == spec]
+            patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+        except:
+            flash("Unable to load data (AWS Error)", 'warning')
 
     return render_template('doctor_dashboard.html', doctor=doctor, appointments=appointments, patients=patients)
 
@@ -129,10 +145,14 @@ def patient_dashboard():
         flash('Access denied.', 'danger')
         return redirect(url_for('login'))
 
-    all_appts = appointments_table.scan().get('Items', [])
-    appointments = [a for a in all_appts if a['patient_email'] == user['email']]
-
-    doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+    appointments, doctors = [], []
+    if AWS_READY:
+        try:
+            all_appts = appointments_table.scan().get('Items', [])
+            appointments = [a for a in all_appts if a['patient_email'] == user['email']]
+            doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+        except:
+            flash("Unable to load dashboard (AWS Error)", 'warning')
 
     return render_template('patient_dashboard.html', user=user['name'], appointments=appointments, doctors=doctors)
 
@@ -143,35 +163,50 @@ def appointment():
         flash('Login as a patient.', 'danger')
         return redirect(url_for('login'))
 
+    if not AWS_READY:
+        flash("AWS not ready.", 'danger')
+        return redirect(url_for('patient_dashboard'))
+
     if request.method == 'POST':
-        appt = {
-            'appointment_id': str(uuid.uuid4()),
-            'patient_email': session['user']['email'],
-            'specialist': request.form['specialist'],
-            'date': request.form['date'],
-            'time': request.form['time'],
-            'reason': request.form['reason']
-        }
-        appointments_table.put_item(Item=appt)
-
-        msg = f"New appointment for {appt['patient_email']} with {appt['specialist']} on {appt['date']} at {appt['time']}"
-        send_sns_notification(msg)
-
-        flash('Appointment booked successfully.', 'success')
-        return redirect(url_for('appointment'))
+        try:
+            appt = {
+                'appointment_id': str(uuid.uuid4()),
+                'patient_email': session['user']['email'],
+                'specialist': request.form['specialist'],
+                'date': request.form['date'],
+                'time': request.form['time'],
+                'reason': request.form['reason']
+            }
+            appointments_table.put_item(Item=appt)
+            msg = f"New appointment: {appt['patient_email']} with {appt['specialist']} on {appt['date']} at {appt['time']}"
+            send_sns_notification(msg)
+            flash('Appointment booked successfully.', 'success')
+            return redirect(url_for('appointment'))
+        except:
+            flash("Could not book appointment (AWS Error)", 'danger')
 
     return render_template('appointment.html', user=session['user'])
 
 
 @app.route('/patient/details')
 def patient_details():
-    patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+    patients = []
+    if AWS_READY:
+        try:
+            patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
+        except:
+            flash("Could not load patients.", 'danger')
     return render_template('patient_details.html', patients=patients)
 
 
 @app.route('/doctor/details')
 def doctor_details():
-    doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+    doctors = []
+    if AWS_READY:
+        try:
+            doctors = [u for u in users_table.scan().get('Items', []) if u['role'] == 'doctor']
+        except:
+            flash("Could not load doctors.", 'danger')
     return render_template('doctor_details.html', doctors=doctors)
 
 
