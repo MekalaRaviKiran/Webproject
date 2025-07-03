@@ -3,7 +3,7 @@ import boto3
 import uuid
 from botocore.exceptions import ClientError
 
-app = Flask(__name__)
+app = Flask(_name_)
 app.secret_key = 'medtrack_secret'
 
 # AWS Setup
@@ -30,6 +30,11 @@ def send_sns_notification(message, subject='MedTrack Alert'):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -157,6 +162,7 @@ def appointment():
 
     return render_template('appointment.html', user=session['user'])
 
+
 @app.route('/patient/details')
 def patient_details():
     patients = [u for u in users_table.scan().get('Items', []) if u['role'] == 'patient']
@@ -177,5 +183,5 @@ def contact():
     return render_template('contact.html')
 
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     app.run(debug=True)
