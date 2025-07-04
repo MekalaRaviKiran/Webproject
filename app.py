@@ -8,8 +8,8 @@ app.secret_key = 'medtrack_secret'
 
 # AWS Setup
 try:
-    dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
-    sns_client = boto3.client('sns', region_name='ap-south-1')
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+    sns_client = boto3.client('sns', region_name='us-east-1')
     users_table = dynamodb.Table('Users')
     appointments_table = dynamodb.Table('Appointments')
     AWS_READY = True
