@@ -17,7 +17,7 @@ except Exception as e:
     print("AWS Setup Error:", str(e))
     AWS_READY = False
 
-TOPIC_ARN = 'arn:aws:sns:ap-south-1:123456789012:YourTopicName'  # Replace later
+TOPIC_ARN = 'arn:aws:sns:us-east-1:253490788465:medtrac:1308a35d-4647-446a-8835-0cb2aa3729ce'  # Replace later
 
 def send_sns_notification(message, subject='MedTrack Alert'):
     if not AWS_READY:
