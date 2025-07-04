@@ -79,7 +79,7 @@ def signup():
                 user['gender'] = request.form['gender']
 
             users_table.put_item(Item=user)
-            flash(f'{role.capitalize()} registered successfully!', 'success')
+            flash('{} registered successfully!'.format(role.capitalize()) 'success')
             return redirect(url_for('login'))
         except (ClientError, NoCredentialsError) as e:
             flash(f"AWS Error: {str(e)}", 'danger')
